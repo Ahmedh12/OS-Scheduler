@@ -412,7 +412,6 @@ int main(int argc, char *argv[])
         fclose(file);
 
         quantum = atoi(argv[2]);
-        charQuantum = argv[2];
         if (RRQ == NULL)
             RRQ = construct_queue(); //constructing a queue data structure composed of a head and a tail pointers to hold the ready process for RR algorithm
 
@@ -424,7 +423,7 @@ int main(int argc, char *argv[])
         while (true)
         {
             receive_process();
-            if (RRQ->head || runningProcess != NULL) //If there are processes in the ready queue
+            if (RRQ->head || runningProcess != NULL) //If there are processes in the ready queue or a process is already running
             {
                 if (runningProcess != NULL) // if a process is running
                 {
@@ -493,8 +492,13 @@ int main(int argc, char *argv[])
                 
                 pause();
             }
+            else
+            {
+                raise(SIGSTOP);
+            }
 
-            if (messagesEnded && !RRQ->head && (finishedProcesses == PCB_processes_count))
+            //printf("RR kalas khalas\n"); 
+            if (!RRQ->head && messagesEnded && (finishedProcesses == PCB_processes_count))
             {
                 float cpu_utilization = 100 * ((float)accumulativeBT/(getClk()-1));
                 float avg_WTA = (float)accumulativeWTA / PCB_processes_count;
@@ -503,6 +507,7 @@ int main(int argc, char *argv[])
                                      (double)(accumulativeWTA / PCB_processes_count) *
                                          (accumulativeWTA / PCB_processes_count));
 
+                printf("RR kalas khalas\n");                         
                 FILE *file = fopen(roundRobin_statistics_filename, "w");
                 if (file == NULL)
                     printf("Error opening %s", roundRobin_statistics_filename);

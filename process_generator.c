@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
 
             if (atoi(argv[1]) == 3) //case RR
             {
-                //kill(sid, SIGCONT); //Continues the scheduler (if blocked) to update the process Table
+                kill(sid, SIGCONT); //Continues the scheduler (if blocked) to update the process Table
                 //kill(sid, SIGUSR1); //Wakes up the schedular to update the Process Table
             }
 
