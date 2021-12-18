@@ -497,8 +497,6 @@ int main(int argc, char *argv[])
             {
                 raise(SIGSTOP);
             }
-
-            //printf("recieved count %d, finished count %d , messagesEnded %d , QueueEmpty %d\n", PCB_processes_count, finishedProcesses, messagesEnded, (RRQ->head) ? 0 : 1);
         }
 
         break;
@@ -678,9 +676,11 @@ void handlerRRUSR1(int sigNum)
     finishedProcesses++;
     runningProcess = NULL;
 
+    //printf("recieved count %d, finished count %d , messagesEnded %d , QueueEmpty %d\n", PCB_processes_count, finishedProcesses, messagesEnded, (RRQ->head) ? 0 : 1);
     if (!RRQ->head && messagesEnded && (finishedProcesses == PCB_processes_count))
     {
-        float cpu_utilization = 100 * ((float)accumulativeBT / (getClk()-1));
+        //printf("In the Condition\n");
+        float cpu_utilization = 100 * ((float)accumulativeBT / (getClk()));
         float avg_WTA = (float)accumulativeWTA / PCB_processes_count;
         float avg_waiting = (float)accumulativeWT / PCB_processes_count;
         float std_WTA = sqrt((double)accumulativeWTAsquared / PCB_processes_count -
