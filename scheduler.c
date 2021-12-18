@@ -36,12 +36,10 @@ struct Queue *RRQ;
 struct Node *runningProcess;
 int quantum;
 int alarmVal;
-char *charQuantum;
 char *charAlgo;
 char *roundRobin_output_filename = "scheduler.log";
 char *roundRobin_statistics_filename = "scheduler.perf";
 int finishedProcesses = 0;
-bool first_process = true;
 
 //Round Robins-specific Functions
 void handlerRRUSR1(int sigNum);     //Child finishes
@@ -320,7 +318,7 @@ int main(int argc, char *argv[])
                         float std = sqrt((double)accumulativeWTAsquared / receivedProcesses - (double)(accumulativeWTA / receivedProcesses) * (accumulativeWTA / receivedProcesses));
                         FILE *write = fopen("scheduler.perf", "w");
                         fprintf(write, "CPU utilization = %.2f%c\nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f\n",
-                                100 * ((float)accumulativeBT / (getClk()-1)), c, (float)accumulativeWTA / receivedProcesses,
+                                100 * ((float)accumulativeBT / (getClk() - 1)), c, (float)accumulativeWTA / receivedProcesses,
                                 (float)accumulativeWT / receivedProcesses, std);
                         fclose(write);
                         destroyClk(false);
@@ -417,12 +415,14 @@ int main(int argc, char *argv[])
 
         signal(SIGALRM, handlerRRSigAlarm);
         signal(SIGUSR1, handlerRRUSR1);
+        signal(SIGCONT, SIG_DFL);
 
         runningProcess = NULL; //Node to hold the data of the currently running process
         messagesEnded = false; //flag to indicate that the last process has been sent by the scheduler
         while (true)
         {
-            receive_process();
+            if (!messagesEnded)
+                receive_process();
             if (RRQ->head || runningProcess != NULL) //If there are processes in the ready queue or a process is already running
             {
                 if (runningProcess != NULL) // if a process is running
@@ -482,42 +482,23 @@ int main(int argc, char *argv[])
                                 0);
 
                 kill(runningProcess->pid, SIGCONT);
-                if(quantum > runningProcess->remaining_time)
+                if (quantum > runningProcess->remaining_time)
                 {
                     alarm(runningProcess->remaining_time);
-                }else
+                }
+                else
                 {
                     alarm(quantum);
                 }
-                
+
                 pause();
             }
-            else
+            else if (!messagesEnded)
             {
                 raise(SIGSTOP);
             }
 
-            //printf("RR kalas khalas\n"); 
-            if (!RRQ->head && messagesEnded && (finishedProcesses == PCB_processes_count))
-            {
-                float cpu_utilization = 100 * ((float)accumulativeBT/(getClk()-1));
-                float avg_WTA = (float)accumulativeWTA / PCB_processes_count;
-                float avg_waiting = (float)accumulativeWT / PCB_processes_count;
-                float std_WTA = sqrt((double)accumulativeWTAsquared / PCB_processes_count -
-                                     (double)(accumulativeWTA / PCB_processes_count) *
-                                         (accumulativeWTA / PCB_processes_count));
-
-                printf("RR kalas khalas\n");                         
-                FILE *file = fopen(roundRobin_statistics_filename, "w");
-                if (file == NULL)
-                    printf("Error opening %s", roundRobin_statistics_filename);
-                fprintf(file, "CPU utilization = %.2f%% \nAvg WTA = %.2f \nAvg Waiting = %.2f \nStd WTA = %.2f ",
-                        cpu_utilization, avg_WTA, avg_waiting, std_WTA);
-                fclose(file);
-
-                destroyClk(false);
-                exit(0);
-            }
+            //printf("recieved count %d, finished count %d , messagesEnded %d , QueueEmpty %d\n", PCB_processes_count, finishedProcesses, messagesEnded, (RRQ->head) ? 0 : 1);
         }
 
         break;
@@ -660,11 +641,10 @@ void receive_process()
             }
             else //Stop the created process, enqueue it and send its burst time
             {
+                kill(pid, SIGSTOP);
                 struct Node *node = construct_node(newProcess.process_id, newProcess.arrival_time, newProcess.burst_time, newProcess.priority, pid);
-                accumulativeBT += newProcess.burst_time;
                 enqueue(RRQ, node);
                 PCB_processes_count++;
-                kill(pid, SIGSTOP);
             }
         }
     }
@@ -676,6 +656,7 @@ void handlerRRUSR1(int sigNum)
     int TA = currentTime - runningProcess->arrival_time;                              // turn around time
     float WTA = (float)TA / runningProcess->burst_time;                               // weighted turnaround time
     int WT = currentTime - runningProcess->arrival_time - runningProcess->burst_time; // waiting time
+    accumulativeBT += runningProcess->burst_time;
     runningProcess->state = FINISHED;
     runningProcess->remaining_time = 0;
     runningProcess->waiting_time = WT;
@@ -696,6 +677,26 @@ void handlerRRUSR1(int sigNum)
 
     finishedProcesses++;
     runningProcess = NULL;
+
+    if (!RRQ->head && messagesEnded && (finishedProcesses == PCB_processes_count))
+    {
+        float cpu_utilization = 100 * ((float)accumulativeBT / (getClk()-1));
+        float avg_WTA = (float)accumulativeWTA / PCB_processes_count;
+        float avg_waiting = (float)accumulativeWT / PCB_processes_count;
+        float std_WTA = sqrt((double)accumulativeWTAsquared / PCB_processes_count -
+                             (double)(accumulativeWTA / PCB_processes_count) *
+                                 (accumulativeWTA / PCB_processes_count));
+
+        FILE *file = fopen(roundRobin_statistics_filename, "w");
+        if (file == NULL)
+            printf("Error opening %s", roundRobin_statistics_filename);
+        fprintf(file, "CPU utilization = %.2f%% \nAvg WTA = %.2f \nAvg Waiting = %.2f \nStd WTA = %.2f ",
+                cpu_utilization, avg_WTA, avg_waiting, std_WTA);
+        fclose(file);
+
+        destroyClk(false);
+        exit(0);
+    }
 }
 
 void handlerRRSigAlarm(int sigNum)
@@ -754,7 +755,7 @@ void handlerHPFUSR1(int sigNum)
                 float temp = number / 2;
                 float STD_TOTAL_WTA = (number / temp + temp) / 2;
 
-                float utilization = 100 * ((float)TOTAL_BURST_HPF / (getClk()-1));
+                float utilization = 100 * ((float)TOTAL_BURST_HPF / (getClk() - 1));
 
                 //UPDATE THE SCHEDULER.PERF FILE WITH FINAL STATS OF ALGORITHM
                 fp = fopen("scheduler.perf", "w");
