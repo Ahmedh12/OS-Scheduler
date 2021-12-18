@@ -624,7 +624,7 @@ void receive_process()
 {
     if (msgrcv(ArrivalQueueID, &newProcess, sizeof(newProcess) - sizeof(newProcess.mtag), NEW_PROCESS_TAG, IPC_NOWAIT) != -1)
     {
-        printf("a message received\n");
+        //printf("a message received\n");
         if (newProcess.process_id == -1)
         {
             messagesEnded = true;

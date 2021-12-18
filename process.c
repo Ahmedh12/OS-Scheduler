@@ -15,29 +15,42 @@ int main(int agrc, char *argv[])
     remainingtime = atoi(argv[2]); //-----setting the remaining time
     int Finish_time = 0;
 
-    while (remainingtime > 0)
+    if (atoi(argv[1]) == 2)
     {
-        if (start + 1 == getClk())
+        while (remainingtime > 0)
         {
-            remainingtime--;
-            start = getClk();
+            if (start + 1 <= getClk())
+            {
+                remainingtime--;
+                start = getClk();
+            }
+        }
+    }
+    else
+    {
+        while (remainingtime > 0)
+        {
+            if (start + 1 == getClk())
+            {
+                remainingtime--;
+                start = getClk();
+            }
         }
     }
 
     destroyClk(false);
 
-    if (atoi(argv[1]) == 2 )
+    if (atoi(argv[1]) == 2)
     {
         kill(getppid(), SIGCONT);
         kill(getppid(), SIGUSR2);
-    }else if( atoi(argv[1]) == 3)
-    {
-       kill(getppid(),SIGUSR1);
-    }else
-    {
-         exit(0); 
     }
-    
-
-    
+    else if (atoi(argv[1]) == 3)
+    {
+        kill(getppid(), SIGUSR1);
+    }
+    else
+    {
+        exit(0);
+    }
 }
